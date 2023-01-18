@@ -9,6 +9,10 @@ import simpledb.transaction.TransactionId;
 
 import java.io.*;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -33,6 +37,13 @@ public class BufferPool {
     constructor instead. */
     public static final int DEFAULT_PAGES = 50;
 
+    /** Store pages */
+    private final List<Page> _pages;
+
+//    private Map<Integer, DbFile>
+    /** Fixed number of pages */
+    private int _numPages;
+
     /**
      * Creates a BufferPool that caches up to numPages pages.
      *
@@ -40,6 +51,8 @@ public class BufferPool {
      */
     public BufferPool(int numPages) {
         // some code goes here
+        _pages = new ArrayList<>();
+        this._numPages = numPages;
     }
     
     public static int getPageSize() {
@@ -71,9 +84,18 @@ public class BufferPool {
      * @param pid the ID of the requested page
      * @param perm the requested permissions on the page
      */
-    public  Page getPage(TransactionId tid, PageId pid, Permissions perm)
+    public Page getPage(TransactionId tid, PageId pid, Permissions perm)
         throws TransactionAbortedException, DbException {
         // some code goes here
+        // bufferpool has page of pid, return page
+
+        // bufferpool has not page of pid, retrieve it from disk
+        // if exceed numPages (no space)
+        if(_pages.size() >= _numPages){
+            throw new DbException("Pages are full in BufferPool!");
+        }
+        // retrieve it and add to buffer pool
+        _numPages ++;
         return null;
     }
 

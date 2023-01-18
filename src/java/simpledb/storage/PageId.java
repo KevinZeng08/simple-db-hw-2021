@@ -1,14 +1,15 @@
 package simpledb.storage;
 
+
 /** PageId is an interface to a specific page of a specific table. */
 public interface PageId {
 
     /** Return a representation of this page id object as a collection of
-        integers (used for logging)
+     integers (used for logging)
 
-        This class MUST have a constructor that accepts n integer parameters,
-        where n is the number of integers returned in the array from serialize.
-    */
+     This class MUST have a constructor that accepts n integer parameters,
+     where n is the number of integers returned in the array from serialize.
+     */
     int[] serialize();
 
     /** @return the unique tableid hashcode with this PageId */
@@ -33,4 +34,3 @@ public interface PageId {
 
     int getPageNumber();
 }
-

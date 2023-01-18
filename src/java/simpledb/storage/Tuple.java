@@ -1,8 +1,12 @@
 package simpledb.storage;
 
+import simpledb.common.Type;
+
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.List;
 
 /**
  * Tuple maintains information about the contents of a tuple. Tuples have a
@@ -13,6 +17,9 @@ public class Tuple implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
+    private TupleDesc _schema;
+//    private List<Field> _fields;
+    private Field[] _fields;
     /**
      * Create a new tuple with the specified schema (type).
      *
@@ -22,6 +29,10 @@ public class Tuple implements Serializable {
      */
     public Tuple(TupleDesc td) {
         // some code goes here
+        if(td.numFields() < 1) return;
+        this._schema = td;
+//        _fields = new ArrayList<>(td.numFields());
+        _fields = new Field[td.numFields()];
     }
 
     /**
@@ -29,7 +40,7 @@ public class Tuple implements Serializable {
      */
     public TupleDesc getTupleDesc() {
         // some code goes here
-        return null;
+        return _schema;
     }
 
     /**
@@ -61,6 +72,7 @@ public class Tuple implements Serializable {
      */
     public void setField(int i, Field f) {
         // some code goes here
+        _fields[i] = f;
     }
 
     /**
@@ -71,7 +83,7 @@ public class Tuple implements Serializable {
      */
     public Field getField(int i) {
         // some code goes here
-        return null;
+        return _fields[i];
     }
 
     /**
@@ -84,7 +96,19 @@ public class Tuple implements Serializable {
      */
     public String toString() {
         // some code goes here
-        throw new UnsupportedOperationException("Implement this");
+//        throw new UnsupportedOperationException("Implement this");
+        StringBuilder res = new StringBuilder();
+        for(Field field : _fields) {
+            Type type = field.getType();
+            if("INT_TYPE".equals(type.name())){
+                IntField intField = (IntField)field;
+                res.append(intField.getValue()).append("\t");
+            }else if("STRING_TYPE".equals(type.name())){
+                StringField stringField = (StringField)field;
+                res.append(stringField.getValue()).append("\t");
+            }
+        }
+        return res.toString();
     }
 
     /**
@@ -94,7 +118,8 @@ public class Tuple implements Serializable {
     public Iterator<Field> fields()
     {
         // some code goes here
-        return null;
+        List<Field> fields = Arrays.asList(_fields);
+        return fields.iterator();
     }
 
     /**
@@ -103,5 +128,6 @@ public class Tuple implements Serializable {
     public void resetTupleDesc(TupleDesc td)
     {
         // some code goes here
+        this._schema = td;
     }
 }

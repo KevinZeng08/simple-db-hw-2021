@@ -2,7 +2,6 @@ package simpledb.storage;
 
 import simpledb.common.Database;
 import simpledb.common.DbException;
-import simpledb.common.Debug;
 import simpledb.common.Catalog;
 import simpledb.transaction.TransactionId;
 
@@ -73,7 +72,8 @@ public class HeapPage implements Page {
     */
     private int getNumTuples() {        
         // some code goes here
-        return 0;
+        int tuples = Math.floorDiv(BufferPool.getPageSize() * 8, td.getSize() * 8 + 1);
+        return tuples;
 
     }
 
@@ -81,11 +81,13 @@ public class HeapPage implements Page {
      * Computes the number of bytes in the header of a page in a HeapFile with each tuple occupying tupleSize bytes
      * @return the number of bytes in the header of a page in a HeapFile with each tuple occupying tupleSize bytes
      */
-    private int getHeaderSize() {        
-        
+    private int getHeaderSize() {
         // some code goes here
-        return 0;
-                 
+        int headerSize = Math.floorDiv(numSlots,8);
+        if(numSlots % 8 != 0) {
+            headerSize++;
+        }
+        return headerSize;
     }
     
     /** Return a view of this page before it was modified
@@ -118,7 +120,8 @@ public class HeapPage implements Page {
      */
     public HeapPageId getId() {
     // some code goes here
-    throw new UnsupportedOperationException("implement this");
+//    throw new UnsupportedOperationException("implement this");
+        return pid;
     }
 
     /**
@@ -288,7 +291,17 @@ public class HeapPage implements Page {
      */
     public int getNumEmptySlots() {
         // some code goes here
-        return 0;
+        int count = 0;
+        for(byte b : header) {
+            // count number of '0' in this byte
+            for(int i=0;i<8;i++){
+                if((b & 0x01) == 0x00){
+                    count++;
+                }
+                b >>= 1;
+            }
+        }
+        return count;
     }
 
     /**
@@ -296,7 +309,16 @@ public class HeapPage implements Page {
      */
     public boolean isSlotUsed(int i) {
         // some code goes here
-        return false;
+        // header: 1000 1110 1 1 0 0
+        // slotNo: 7654 3210 11109 8 big endian!!!
+        int byteNo = i >> 3;
+        int bitNo = i % 8;
+        byte b = header[byteNo];
+        for(int j = 0;j < bitNo;j++){
+            b >>= 1;
+        }
+        int isUsed = b & 0x01;
+        return isUsed == 1;
     }
 
     /**
@@ -307,13 +329,43 @@ public class HeapPage implements Page {
         // not necessary for lab1
     }
 
+    //TODO optimize?
+    public class TupleIterator implements Iterator<Tuple> {
+        private int currentIdx = -1;
+
+        @Override
+        public boolean hasNext() {
+            int nextIndex = currentIdx + 1;
+            while(nextIndex < numSlots) {
+                if(isSlotUsed(nextIndex)) {
+                    currentIdx = nextIndex;
+                    return true;
+                }
+                nextIndex++;
+            }
+            return false;
+        }
+
+        @Override
+        public Tuple next() {
+            return tuples[currentIdx];
+        }
+    }
     /**
      * @return an iterator over all tuples on this page (calling remove on this iterator throws an UnsupportedOperationException)
      * (note that this iterator shouldn't return tuples in empty slots!)
      */
     public Iterator<Tuple> iterator() {
         // some code goes here
-        return null;
+        // do not use Iterator of List to avoid memory copy!!!
+//        List<Tuple> usedTuples = new ArrayList<>();
+//        for(int i = 0; i < tuples.length; i++){
+//            if(isSlotUsed(i)) {
+//                usedTuples.add(tuples[i]);
+//            }
+//        }
+//        return usedTuples.iterator();
+        return new TupleIterator();
     }
 
 }

@@ -7,6 +7,7 @@ import simpledb.storage.IntField;
 import java.text.ParseException;
 import java.io.*;
 
+
 /**
  * Class representing a type in SimpleDB.
  * Types are static objects defined by this class; hence, the Type
@@ -47,21 +48,21 @@ public enum Type implements Serializable {
             }
         }
     };
-    
+
     public static final int STRING_LEN = 128;
 
-  /**
-   * @return the number of bytes required to store a field of this type.
-   */
+    /**
+     * @return the number of bytes required to store a field of this type.
+     */
     public abstract int getLen();
 
-  /**
-   * @return a Field object of the same type as this object that has contents
-   *   read from the specified DataInputStream.
-   * @param dis The input stream to read from
-   * @throws ParseException if the data read from the input stream is not
-   *   of the appropriate type.
-   */
+    /**
+     * @return a Field object of the same type as this object that has contents
+     *   read from the specified DataInputStream.
+     * @param dis The input stream to read from
+     * @throws ParseException if the data read from the input stream is not
+     *   of the appropriate type.
+     */
     public abstract Field parse(DataInputStream dis) throws ParseException;
 
 }
