@@ -3,7 +3,6 @@ package simpledb.storage;
 import simpledb.common.Database;
 import simpledb.common.Permissions;
 import simpledb.common.DbException;
-import simpledb.common.DeadlockException;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
@@ -11,9 +10,7 @@ import java.io.*;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * BufferPool manages the reading and writing of pages into memory from
@@ -38,11 +35,9 @@ public class BufferPool {
     public static final int DEFAULT_PAGES = 50;
 
     /** Store pages */
-    private final List<Page> _pages;
-
-//    private Map<Integer, DbFile>
+    private Map<PageId,Page> pages;
     /** Fixed number of pages */
-    private int _numPages;
+    private int numPages;
 
     /**
      * Creates a BufferPool that caches up to numPages pages.
@@ -51,8 +46,8 @@ public class BufferPool {
      */
     public BufferPool(int numPages) {
         // some code goes here
-        _pages = new ArrayList<>();
-        this._numPages = numPages;
+        pages = new HashMap<>();
+        this.numPages = numPages;
     }
     
     public static int getPageSize() {
@@ -87,16 +82,23 @@ public class BufferPool {
     public Page getPage(TransactionId tid, PageId pid, Permissions perm)
         throws TransactionAbortedException, DbException {
         // some code goes here
-        // bufferpool has page of pid, return page
-
-        // bufferpool has not page of pid, retrieve it from disk
         // if exceed numPages (no space)
-        if(_pages.size() >= _numPages){
+        if(pages.size() >= numPages){
             throw new DbException("Pages are full in BufferPool!");
         }
-        // retrieve it and add to buffer pool
-        _numPages ++;
-        return null;
+        // buffer pool has this page, return it directly
+        if(pages.containsKey(pid)) {
+            return pages.get(pid);
+        }
+        // buffer pool has not, retrieve it from disk and add to buffer pool
+        int tableid = pid.getTableId();
+        // get DbFile of this table through Catalog
+        DbFile dbFile = Database.getCatalog().getDatabaseFile(tableid);
+        // read page from disk
+        Page page = dbFile.readPage(pid);
+        // add into buffer pool
+        pages.put(pid,page);
+        return page;
     }
 
     /**

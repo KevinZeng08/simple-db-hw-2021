@@ -187,19 +187,27 @@ public class TupleDesc implements Serializable {
      */
     public static TupleDesc merge(TupleDesc td1, TupleDesc td2) {
         // some code goes here
-        int numFields = td1.numFields() + td2.numFields();
+        int numFields = 0;
+        Iterator<TDItem> it1 = null;
+        Iterator<TDItem> it2 = null;
+        if(td1 != null) {
+            numFields += td1.numFields();
+            it1=td1.iterator();
+        }
+        if(td2 != null) {
+            numFields += td2.numFields();
+            it2 = td2.iterator();
+        }
         Type[] typeAr = new Type[numFields];
         String[] fieldAr = new String[numFields];
         int idx = 0;
-        Iterator<TDItem> it1 = td1.iterator();
-        Iterator<TDItem> it2 = td2.iterator();
-        while(it1.hasNext()){
+        while(it1 != null && it1.hasNext()){
             TDItem tdItem1 = it1.next();
             typeAr[idx] = tdItem1.fieldType;
             fieldAr[idx] = tdItem1.fieldName;
             idx++;
         }
-        while(it2.hasNext()) {
+        while(it2 != null && it2.hasNext()) {
             TDItem tdItem2 = it2.next();
             typeAr[idx] = tdItem2.fieldType;
             fieldAr[idx] = tdItem2.fieldName;

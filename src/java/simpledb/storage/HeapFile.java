@@ -1,11 +1,14 @@
 package simpledb.storage;
 
+import simpledb.common.Database;
 import simpledb.common.DbException;
+import simpledb.common.Permissions;
+import simpledb.index.BTreeLeafPage;
+import simpledb.index.BTreePageId;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
 import java.io.*;
-import java.nio.Buffer;
 import java.util.*;
 
 /**
@@ -93,7 +96,7 @@ public class HeapFile implements DbFile {
             throw new IllegalArgumentException();
         }
         // random access by offset
-        RandomAccessFile ra;
+        RandomAccessFile ra = null;
         byte[] pageData = HeapPage.createEmptyPageData();
         try {
             ra = new RandomAccessFile(file,"r");
@@ -101,6 +104,12 @@ public class HeapFile implements DbFile {
             ra.read(pageData);
         } catch (IOException e) {
             e.printStackTrace();
+        }finally {
+            try {
+                ra.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
         // construct HeapPage
         HeapPageId hpid = (HeapPageId)pid;
@@ -149,42 +158,92 @@ public class HeapFile implements DbFile {
         // not necessary for lab1
     }
 
-    public class HeapFileIterator implements DbFileIterator {
-        private TransactionId tid;
+    class HeapFileIterator extends AbstractDbFileIterator {
+        Iterator<Tuple> it = null;
+        HeapPage curPage = null;
 
-        public HeapFileIterator() {}
+        final TransactionId tid;
+        final HeapFile hf;
 
-        public HeapFileIterator(TransactionId tid) { this.tid = tid; }
+        public HeapFileIterator(TransactionId tid, HeapFile hf) {
+            this.tid = tid;
+            this.hf = hf;
+        }
+
+        /**
+         * get the first page of HeapFile and initialize Iterator<Tuple>
+         * @throws DbException
+         * @throws TransactionAbortedException
+         */
         @Override
         public void open() throws DbException, TransactionAbortedException {
-
+            HeapPageId firstPageId = new HeapPageId(tableid,0);
+            curPage = (HeapPage) Database.getBufferPool().getPage(tid,firstPageId, Permissions.READ_ONLY);
+            it = curPage.iterator();
         }
 
+        /**
+         * 	Read the next tuple either from the current page if it has more tuples or
+         * 	from the next page by following the right sibling pointer.
+         * @return
+         */
         @Override
-        public boolean hasNext() throws DbException, TransactionAbortedException {
-            return false;
+        protected Tuple readNext() throws DbException, TransactionAbortedException {
+            // curPage has no more page to iterate, set null
+            if (it != null && !it.hasNext())
+                it = null;
+
+            while (it == null && curPage != null) {
+                // whether reach the end page of DbFile
+                HeapPageId nextp = null;
+                HeapPageId curp = curPage.pid;
+                if(curp.getPageNumber() < numPages() - 1) {
+                    nextp = new HeapPageId(tableid,curp.getPageNumber() + 1);
+                }
+                if(nextp == null) {
+                    curPage = null;
+                }
+                else {
+                    curPage = (HeapPage) Database.getBufferPool().getPage(tid,
+                            nextp, Permissions.READ_ONLY);
+                    it = curPage.iterator();
+                    // page has not tuple
+                    if (!it.hasNext())
+                        it = null;
+                }
+            }
+
+            if (it == null)
+                return null;
+            return it.next();
         }
 
-        @Override
-        public Tuple next() throws DbException, TransactionAbortedException, NoSuchElementException {
-            return null;
-        }
-
+        /**
+         * rewind this iterator back to the beginning of the tuples
+         */
         @Override
         public void rewind() throws DbException, TransactionAbortedException {
-
+            close();
+            open();
         }
 
+        /**
+         * close the iterator
+         */
         @Override
         public void close() {
-
+            super.close();
+            it = null;
+            curPage = null;
         }
+
+
     }
 
     // see DbFile.java for javadocs
     public DbFileIterator iterator(TransactionId tid) {
         // some code goes here
-        return new HeapFileIterator(tid);
+        return new HeapFileIterator(tid, this);
     }
 
 }
