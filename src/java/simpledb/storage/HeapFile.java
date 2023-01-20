@@ -7,6 +7,7 @@ import simpledb.index.BTreeLeafPage;
 import simpledb.index.BTreePageId;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
+import sun.security.krb5.internal.PAData;
 
 import java.io.*;
 import java.util.*;
@@ -126,6 +127,30 @@ public class HeapFile implements DbFile {
     public void writePage(Page page) throws IOException {
         // some code goes here
         // not necessary for lab1
+
+        // append it to File
+        // calculate offset of file
+        int pageNo = page.getId().getPageNumber();
+        long byteOffset = pageNo * BufferPool.getPageSize();
+        // if offset overflow
+        if(byteOffset > file.length()) {
+            throw new IllegalArgumentException();
+        }
+        // random access by offset, write page into File
+        RandomAccessFile ra = null;
+        try {
+            ra = new RandomAccessFile(file,"rw");
+            ra.seek(byteOffset);
+            ra.write(page.getPageData());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }finally {
+            try {
+                ra.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     /**
@@ -135,8 +160,8 @@ public class HeapFile implements DbFile {
         // some code goes here
         int pageSize = BufferPool.getPageSize();
         long totalSize = file.length();
-        int num = Math.toIntExact(totalSize / pageSize);
-        if(totalSize % pageSize != 0) {
+        int num = (int) (totalSize / pageSize);
+        if(totalSize != 0 && totalSize % pageSize != 0) {
             num++;
         }
         return num;
@@ -146,16 +171,53 @@ public class HeapFile implements DbFile {
     public List<Page> insertTuple(TransactionId tid, Tuple t)
             throws DbException, IOException, TransactionAbortedException {
         // some code goes here
-        return null;
         // not necessary for lab1
+        List<Page> affectedPages = new ArrayList<>();
+        // find a page with an empty slot
+        for(int i = 0;i < numPages(); i++) {
+            PageId pid = new HeapPageId(tableid,i);
+            HeapPage heapPage = (HeapPage) Database.getBufferPool().getPage(tid,pid,Permissions.READ_WRITE);
+            // has an empty slot, insert and marked dirty
+            if(heapPage.getNumEmptySlots() > 0) {
+                heapPage.insertTuple(t);
+                heapPage.markDirty(true,tid);
+                affectedPages.add(heapPage);
+                break;
+            }
+        }
+        // not found, create a new page and append it to the physical file
+        if(affectedPages.size() == 0) {
+            HeapPageId pid = new HeapPageId(tableid,numPages());
+            writePage(new HeapPage(pid,HeapPage.createEmptyPageData()));
+            // fetch new page by BufferPool
+            HeapPage newPage = (HeapPage) Database.getBufferPool().getPage(tid,pid,Permissions.READ_WRITE);
+            newPage.insertTuple(t);
+            newPage.markDirty(true,tid);
+            affectedPages.add(newPage);
+        }
+        return affectedPages;
     }
 
     // see DbFile.java for javadocs
-    public ArrayList<Page> deleteTuple(TransactionId tid, Tuple t) throws DbException,
+    public List<Page> deleteTuple(TransactionId tid, Tuple t) throws DbException,
             TransactionAbortedException {
         // some code goes here
-        return null;
         // not necessary for lab1
+        List<Page> affectedPage = new ArrayList<>();
+        // check Tuple in this HeapFile
+        PageId pid = t.getRecordId().getPageId();
+        int tableId = pid.getTableId();
+        if(tableId != tableid) {
+            throw new DbException("deleteTuple: tableid mismatch");
+        }
+        if(pid.getPageNumber() > numPages() - 1) {
+            throw new DbException("deleteTuple: page not exist");
+        }
+        HeapPage heapPage = (HeapPage) Database.getBufferPool().getPage(tid,pid,Permissions.READ_WRITE);
+        heapPage.deleteTuple(t);
+        heapPage.markDirty(true,tid);
+        affectedPage.add(heapPage);
+        return affectedPage;
     }
 
     class HeapFileIterator extends AbstractDbFileIterator {
@@ -204,8 +266,9 @@ public class HeapFile implements DbFile {
                     curPage = null;
                 }
                 else {
+                    // fetch next page
                     curPage = (HeapPage) Database.getBufferPool().getPage(tid,
-                            nextp, Permissions.READ_ONLY);
+                            nextp, Permissions.READ_WRITE);
                     it = curPage.iterator();
                     // page has not tuple
                     if (!it.hasNext())

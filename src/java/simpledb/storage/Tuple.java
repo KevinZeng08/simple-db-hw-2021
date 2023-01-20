@@ -2,11 +2,9 @@ package simpledb.storage;
 
 import simpledb.common.Type;
 
+import javax.print.DocFlavor;
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Iterator;
-import java.util.List;
 
 /**
  * Tuple maintains information about the contents of a tuple. Tuples have a
@@ -20,6 +18,7 @@ public class Tuple implements Serializable {
     private TupleDesc _schema;
 //    private List<Field> _fields;
     private Field[] _fields;
+    private RecordId rid;
     /**
      * Create a new tuple with the specified schema (type).
      *
@@ -49,7 +48,7 @@ public class Tuple implements Serializable {
      */
     public RecordId getRecordId() {
         // some code goes here
-        return null;
+        return rid;
     }
 
     /**
@@ -60,6 +59,7 @@ public class Tuple implements Serializable {
      */
     public void setRecordId(RecordId rid) {
         // some code goes here
+        this.rid = rid;
     }
 
     /**
@@ -111,6 +111,23 @@ public class Tuple implements Serializable {
         return res.toString();
     }
 
+    public class FieldIterator implements Iterator<Field> {
+
+        int curIdx = 0;
+
+        @Override
+        public boolean hasNext() {
+            if(_fields.length > curIdx) {
+                return true;
+            }
+            return false;
+        }
+
+        @Override
+        public Field next() {
+            return _fields[curIdx++];
+        }
+    }
     /**
      * @return
      *        An iterator which iterates over all the fields of this tuple
@@ -118,8 +135,9 @@ public class Tuple implements Serializable {
     public Iterator<Field> fields()
     {
         // some code goes here
-        List<Field> fields = Arrays.asList(_fields);
-        return fields.iterator();
+//        List<Field> fields = Arrays.asList(_fields);
+//        return fields.iterator();
+        return new FieldIterator();
     }
 
     /**

@@ -10,6 +10,7 @@ import java.io.*;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -35,7 +36,7 @@ public class BufferPool {
     public static final int DEFAULT_PAGES = 50;
 
     /** Store pages */
-    private Map<PageId,Page> pages;
+    private Map<PageId,Page> pageStore;
     /** Fixed number of pages */
     private int numPages;
 
@@ -46,7 +47,7 @@ public class BufferPool {
      */
     public BufferPool(int numPages) {
         // some code goes here
-        pages = new HashMap<>();
+        pageStore = new HashMap<>();
         this.numPages = numPages;
     }
     
@@ -83,12 +84,12 @@ public class BufferPool {
         throws TransactionAbortedException, DbException {
         // some code goes here
         // if exceed numPages (no space)
-        if(pages.size() >= numPages){
+        if(pageStore.size() >= numPages){
             throw new DbException("Pages are full in BufferPool!");
         }
         // buffer pool has this page, return it directly
-        if(pages.containsKey(pid)) {
-            return pages.get(pid);
+        if(pageStore.containsKey(pid)) {
+            return pageStore.get(pid);
         }
         // buffer pool has not, retrieve it from disk and add to buffer pool
         int tableid = pid.getTableId();
@@ -97,7 +98,7 @@ public class BufferPool {
         // read page from disk
         Page page = dbFile.readPage(pid);
         // add into buffer pool
-        pages.put(pid,page);
+        pageStore.put(pid,page);
         return page;
     }
 
@@ -147,13 +148,13 @@ public class BufferPool {
     /**
      * Add a tuple to the specified table on behalf of transaction tid.  Will
      * acquire a write lock on the page the tuple is added to and any other 
-     * pages that are updated (Lock acquisition is not needed for lab2). 
+     * pages that are updated (Lock acquisition is not needed for lab2).
      * May block if the lock(s) cannot be acquired.
      * 
      * Marks any pages that were dirtied by the operation as dirty by calling
-     * their markDirty bit, and adds versions of any pages that have 
-     * been dirtied to the cache (replacing any existing versions of those pages) so 
-     * that future requests see up-to-date pages. 
+     * their markDirty bit, and adds versions of any pages that have
+     * been dirtied to the cache (replacing any existing versions of those pages) so
+     * that future requests see up-to-date pages.
      *
      * @param tid the transaction adding the tuple
      * @param tableId the table to add the tuple to
@@ -163,6 +164,8 @@ public class BufferPool {
         throws DbException, IOException, TransactionAbortedException {
         // some code goes here
         // not necessary for lab1
+        DbFile dbFile = Database.getCatalog().getDatabaseFile(tableId);
+        updateBufferPool(dbFile.insertTuple(tid,t),tid);
     }
 
     /**
@@ -171,17 +174,30 @@ public class BufferPool {
      * other pages that are updated. May block if the lock(s) cannot be acquired.
      *
      * Marks any pages that were dirtied by the operation as dirty by calling
-     * their markDirty bit, and adds versions of any pages that have 
-     * been dirtied to the cache (replacing any existing versions of those pages) so 
-     * that future requests see up-to-date pages. 
+     * their markDirty bit, and adds versions of any pages that have
+     * been dirtied to the cache (replacing any existing versions of those pages) so
+     * that future requests see up-to-date pages.
      *
      * @param tid the transaction deleting the tuple.
      * @param t the tuple to delete
      */
-    public  void deleteTuple(TransactionId tid, Tuple t)
+    public void deleteTuple(TransactionId tid, Tuple t)
         throws DbException, IOException, TransactionAbortedException {
         // some code goes here
         // not necessary for lab1
+        int tableId = t.getRecordId().getPageId().getTableId();
+        DbFile dbFile = Database.getCatalog().getDatabaseFile(tableId);
+        updateBufferPool(dbFile.deleteTuple(tid,t),tid);
+    }
+
+    private void updateBufferPool(List<Page> pageList, TransactionId tid) throws DbException {
+        for(Page page : pageList) {
+            page.markDirty(true,tid);
+            pageStore.put(page.getId(),page);
+            if(pageStore.size() > numPages) {
+                evictPage();
+            }
+        }
     }
 
     /**
