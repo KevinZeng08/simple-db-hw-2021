@@ -99,7 +99,7 @@ public class JoinOptimizer {
      * The cost of the join should be calculated based on the join algorithm (or
      * algorithms) that you implemented for Lab 2. It should be a function of
      * the amount of data that must be read over the course of the query, as
-     * well as the number of CPU opertions performed by your join. Assume that
+     * well as the number of CPU operations performed by your join. Assume that
      * the cost of a single predicate application is roughly 1.
      * 
      * 
@@ -130,10 +130,14 @@ public class JoinOptimizer {
             // HINT: You may need to use the variable "j" if you implemented
             // a join algorithm that's more complicated than a basic
             // nested-loops join.
-            return -1.0;
+
+            // For nested-loops join:
+            // joincost(t1,t2) = scancost(t1) + ntup(t1)*scancost(t2) + ntup(t1)*ntup(t2)
+            return cost1 + card1 * cost2 + card1 * card2;
         }
     }
 
+    // TODO a more sophisticated algorithm to join cardinality estimation
     /**
      * Estimate the cardinality of a join. The cardinality of a join is the
      * number of tuples produced by the join.
@@ -176,9 +180,22 @@ public class JoinOptimizer {
                                                    Map<String, Integer> tableAliasToId) {
         int card = 1;
         // some code goes here
+        // based on the rules in Lab2 script
+        if(joinOp == Predicate.Op.EQUALS) {
+            if(t1pkey) {
+                card = card2;
+            } else if(t2pkey) {
+                card = card1;
+            } else {
+                card = Math.max(card1,card2);
+            }
+        } else {
+            card = (int) (0.3 * (card1 * card2));
+        }
         return card <= 0 ? 1 : card;
     }
 
+    // TODO improve this function to a lazy mode (iterator)
     /**
      * Helper method to enumerate all of the subsets of a given size of a
      * specified vector.
@@ -238,7 +255,42 @@ public class JoinOptimizer {
 
         // some code goes here
         //Replace the following
-        return joins;
+        // when computing bestplan(j), we already know bestplan(j-1,j-2,...,1) in PlanCache
+        PlanCache pc = new PlanCache();
+        HashSet<LogicalJoinNode> joinSet = new HashSet<>(joins);
+        for (int i = 1; i <= joins.size(); i++) {
+            // subsets of joins in size i
+            Set<Set<LogicalJoinNode>> subsets = enumerateSubsets(joins, i);
+            // remove one element of subset(i), calculate bestplan by subset(i-1)
+            Iterator<Set<LogicalJoinNode>> it = subsets.iterator();
+            while (it.hasNext()) {
+                // bestplan
+                CostCard bestplan = null;
+                Set<LogicalJoinNode> subset = it.next();
+                Deque<LogicalJoinNode> subsetList = new LinkedList<>(subset);
+                // search subplans with size (i-1)
+                while (!subsetList.isEmpty()) {
+                    LogicalJoinNode joinToRemove = subsetList.poll();
+                    double bestCostSoFar = bestplan != null ? bestplan.cost : Double.MAX_VALUE;
+                    CostCard plan = computeCostAndCardOfSubplan(stats, filterSelectivities, joinToRemove, subset, bestCostSoFar, pc);
+                    if(plan != null && (bestplan == null || plan.cost < bestplan.cost)) {
+                        bestplan = plan;
+                    }
+                }
+                if(bestplan != null){
+                    if(i == joins.size()) {
+                        pc.addPlan(joinSet,bestplan.cost,bestplan.card,bestplan.plan);
+                    } else {
+                        pc.addPlan(subset,bestplan.cost,bestplan.card,bestplan.plan);
+                    }
+                }
+            }
+        }
+        List<LogicalJoinNode> bestJoinOrder = pc.getOrder(joinSet);
+        if(explain) {
+            printJoins(bestJoinOrder,pc,stats,filterSelectivities);
+        }
+        return bestJoinOrder;
     }
 
     // ===================== Private Methods =================================

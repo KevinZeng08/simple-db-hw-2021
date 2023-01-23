@@ -75,6 +75,7 @@ to review the <a href="https://github.com/MIT-DB-Class/simple-db-hw-2021/blob/ma
 before starting this lab.  Briefly, if you have a catalog file
 <tt>catalog.txt</tt> describing your tables, you can run the parser by
 typing:
+
 ```
 java -jar dist/simpledb.jar parser catalog.txt
 ```
@@ -109,6 +110,7 @@ the basic operation is as follows:
     <tt>LogicalPlan</tt> instance it has constructed.  The <tt>physicalPlan</tt> method returns a
     <tt>DBIterator</tt> object that can be used to actually run the query.
     
+
 In the exercises to come, you will implement the methods that help
 <tt>physicalPlan</tt> devise an optimal plan.
 
@@ -147,7 +149,7 @@ cost(predicate application) = 1
 cost(pageScan) = SCALING_FACTOR x cost(predicate application)
 ```
 
-For this lab, you can ignore the effects of caching (e.g., assume that
+For this lab, you can **ignore the effects of caching** (e.g., assume that
 every access to a table incurs the full cost of a scan) -- again, this
 is something you may add as an optional bonus extension to your lab
 in Section 2.3.  Therefore, `scancost(t1)` is simply the
@@ -171,9 +173,9 @@ Here, `ntups(t1)` is the number of tuples in table t1.
 `ntups` can be directly computed for a base table by
 scanning that table.  Estimating `ntups` for a table with
 one or more selection predicates over it can be trickier --
-this is the *filter selectivity estimation* problem.  Here's one
-approach that you might use, based on computing a histogram over the
-values in the table:
+this is the ***filter selectivity estimation*** problem.  Here's one
+approach that you might use, based on **computing a histogram over the**
+**values in the table**:
 
 *  Compute the minimum and maximum values for every attribute in the table (by scanning
    it once).
@@ -248,9 +250,9 @@ choose not to implement histogram-based selectivity estimation).
 ***
 **Exercise 2:  TableStats.java**
 
-The class <tt>TableStats</tt> contains methods that compute
-the number of tuples and pages in a table and that estimate the
-selectivity of predicates over the fields of that table.  The
+The class <tt>TableStats</tt> contains methods that **compute**
+**the number of tuples and pages in a table and that estimate the**
+**selectivity of predicates over the fields of that table**.  The
 query parser we have created creates one instance of <tt>TableStats</tt> per
 table,  and passes these structures into your query optimizer (which
 you will need in later exercises).
@@ -261,7 +263,7 @@ You should fill in the following methods and classes in <tt>TableStats</tt>:
    Once you have
    implemented a method for tracking statistics such as histograms, you
    should implement the <tt>TableStats</tt> constructor, adding code
-   to scan the table (possibly multiple times) to build the statistics
+   to **scan the table (possibly multiple times) to build the statistics**
    you need.
 *   Implement <tt>estimateSelectivity(int field, Predicate.Op op,
     Field constant)</tt>: Using your statistics (e.g., an <tt>IntHistogram</tt>
@@ -302,7 +304,7 @@ While implementing your simple solution, you  should keep in mind the following:
 
 <!--  
   * <a name="change">The following three paragraphs are different in this version of the lab. </a> *
-  .-->
+    .-->
 *  For equality joins, when one of the attributes is a primary key, the number of tuples produced by the join cannot
    be larger than the cardinality of the non-primary key attribute.
 * For equality joins when there is no primary key, it's hard to say much about what the size of the output
@@ -322,7 +324,6 @@ While implementing your simple solution, you  should keep in mind the following:
 ***
 **Exercise 3:  Join Cost Estimation**
 
-
 The class <tt>JoinOptimizer.java</tt> includes all of the methods
 for ordering and computing costs of joins.  In this exercise, you
 will write the methods for estimating the selectivity and cost of
@@ -334,7 +335,7 @@ a join, specifically:
    join j, given that the left input is of cardinality card1, the
    right input of cardinality card2, that the cost to scan the left
    input is cost1, and that the cost to access the right input is
-   card2.  You can assume the join is an NL join, and apply
+   cost2.  You can assume the join is an NL join, and apply
    the formula mentioned earlier.
 *  Implement <tt>estimateJoinCardinality(LogicalJoinNode j, int
    card1, int card2, boolean t1pkey, boolean t2pkey)</tt>: This
@@ -373,7 +374,7 @@ Translating the algorithm given in lecture to the join node list form mentioned 
 To help you implement this algorithm, we have provided several classes and methods to assist you.  First,
 the method <tt>enumerateSubsets(List<T> v, int size)</tt> in <tt>JoinOptimizer.java</tt> will return
 a set of all of the subsets of <tt>v</tt> of size <tt>size</tt>. This method is VERY inefficient for large
-sets; you can earn extra credit by implementing a more efficient enumerator (hint: consider using an in-place
+sets; **you can earn extra credit by implementing a more efficient enumerator** (hint: consider using an in-place
 generation algorithm and a lazy iterator (or stream) interface to avoid materializing the entire power set).
 
 Second, we have provided the method:
@@ -433,16 +434,15 @@ In <tt>JoinOptimizer.java</tt>, implement the method:
 This method should operate on the <tt>joins</tt> class member,
 returning a new List that specifies the order in which joins
 should be done.  Item 0 of this list indicates the left-most,
-bottom-most join in a left-deep plan.  Adjacent joins in the
-returned list should share at least one field to ensure the plan
-is left-deep.  Here <tt>stats</tt> is an object that lets you find
+bottom-most join in a left-deep plan.  **Adjacent joins in the**
+**returned list should share at least one field to ensure the plan**
+**is left-deep**.  Here <tt>stats</tt> is an object that lets you find
 the <tt>TableStats</tt> for a given table name that appears in the
 <tt>FROM</tt> list of the query.  <tt>filterSelectivities</tt>
-allows you to find the selectivity of any predicates over a table;
-it is guaranteed to have one entry per table name in the
+allows you to **find the selectivity of any predicates over a table**;
+it is guaranteed to have **one entry per table name** in the
 <tt>FROM</tt> list.  Finally, <tt>explain</tt> specifies that you
-should output a representation of the join order for informational purposes.
-
+should **output a representation** of the join order for informational purposes.
 
 You may wish to use the helper methods and classes described above to assist
 in your implementation. Roughly, your implementation should follow
@@ -469,11 +469,11 @@ and briefly explain your implementation and present your results (benchmark numb
 *  *Add code to perform more advanced join cardinality estimation*.
    Rather than using simple heuristics to estimate join cardinality,
    devise a more sophisticated algorithm.
-    - One option is to use joint histograms between
-  every pair of attributes *a* and *b* in every pair of tables *t1* and *t2*.
+    - One option is to use **joint histograms between**
+  **every pair of attributes *a* and *b* in every pair of tables *t1* and *t2***.
   The idea is to create buckets of *a*, and for each bucket *A* of *a*, create a
   histogram of *b* values that co-occur with *a* values in *A*.
-    -  Another  way to estimate the cardinality of a join is to assume that each value in the smaller table has a matching value in the larger table. Then the formula for the join selectivity would be: 1/(*Max*(*num-distinct*(t1, column1), *num-distinct*(t2, column2))). Here, column1 and column2 are the join attributes.  The cardinality of the join is then the product of the cardinalities of *t1* and *t2* times the selectivity. <br>
+    -  Another  way to estimate the cardinality of a join is to assume that **each value in the smaller table has a matching value in the larger table**. Then the formula for the join selectivity would be: 1/(*Max*(*num-distinct*(t1, column1), *num-distinct*(t2, column2))). Here, column1 and column2 are the join attributes.  The cardinality of the join is then the product of the cardinalities of *t1* and *t2* times the selectivity. <br>
 *  *Improved subset iterator*.  Our implementation of
    <tt>enumerateSubsets</tt> is quite inefficient, because it creates
    a large number of Java objects on each invocation.  
@@ -482,8 +482,8 @@ and briefly explain your implementation and present your results (benchmark numb
    optimization on plans with 20 or more joins (currently such plans
    takes minutes or hours to compute).
 *  *A cost model that accounts for caching*.  The methods to
-   estimate scan and join cost do not account for caching in the
-   buffer pool.  You should extend the cost model to account for
+   estimate scan and join cost do not **account for caching in the**
+   **buffer pool**.  You should extend the cost model to account for
    caching effects.  This is tricky because multiple joins are
    running simultaneously due to the iterator model, and so it may be
    hard to predict how much memory each will have access to using the
@@ -495,7 +495,7 @@ and briefly explain your implementation and present your results (benchmark numb
    or more additional join algorithms (for example, some form of in
    memory hashing using a <tt>HashMap</tt>).
 *  *Bushy plans*.  Improve the provided <tt>orderJoins()</tt> and other helper
-   methods to generate bushy joins.  Our query plan
+   methods to **generate bushy joins**.  Our query plan
    generation and visualization algorithms are perfectly capable of
    handling bushy plans;  for example, if <tt>orderJoins()</tt>
    returns the list (t1 join t2 ; t3 join t4 ; t2 join t3), this

@@ -518,7 +518,7 @@ public class JoinOptimizerTest extends SimpleDbTestBase {
 
         // Set the last boolean here to 'true' in order to have orderJoins()
         // print out its logic
-        result = j.orderJoins(stats, filterSelectivities, false);
+        result = j.orderJoins(stats, filterSelectivities, true);
 
         // If you're only re-ordering the join nodes,
         // you shouldn't end up with more than you started with
@@ -619,7 +619,7 @@ public class JoinOptimizerTest extends SimpleDbTestBase {
 
         // Set the last boolean here to 'true' in order to have orderJoins()
         // print out its logic
-        result = j.orderJoins(stats, filterSelectivities, false);
+        result = j.orderJoins(stats, filterSelectivities, true);
 
         // If you're only re-ordering the join nodes,
         // you shouldn't end up with more than you started with

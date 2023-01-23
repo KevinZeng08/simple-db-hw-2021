@@ -95,6 +95,7 @@ public class HeapFile implements DbFile {
         // if offset overflow
         if(byteOffset > file.length()) {
             throw new IllegalArgumentException();
+//            return null;
         }
         // random access by offset
         RandomAccessFile ra = null;

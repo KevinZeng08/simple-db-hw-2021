@@ -4,10 +4,10 @@
 **Due: Thursday, Apr 22, 2021 11:59 PM ET**
 
 In this lab, you will implement a simple locking-based
-transaction system in SimpleDB.  You will need to add lock and
-unlock calls at the appropriate places in your code, as well as
-code to track the locks held by each transaction and grant
-locks to transactions as they are needed.
+transaction system in SimpleDB.  You will need to **add lock and**
+**unlock calls at the appropriate places** in your code, as well as
+code to **track the locks held by each transaction and grant**
+**locks to transactions as they are needed**.
 
 The remainder of this document describes what is involved in
 adding transaction support and provides a basic outline of how
@@ -80,6 +80,7 @@ As we discussed in class, this means that:
 *  On transaction commit, you should force dirty pages to disk (e.g.,
    write the pages out) (this is FORCE).
    
+
 To further simplify your life, you may assume that SimpleDB will not crash
 while processing a `transactionComplete` command.  Note that
 these three points mean that you do not need to implement log-based

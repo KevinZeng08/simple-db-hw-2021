@@ -8,10 +8,7 @@ import simpledb.transaction.TransactionId;
 
 import java.io.*;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * BufferPool manages the reading and writing of pages into memory from
@@ -40,6 +37,10 @@ public class BufferPool {
     /** Fixed number of pages */
     private int numPages;
 
+    /** eviction */
+    private Deque<PageId> fifoQueue; // FIFO eviction
+
+
     /**
      * Creates a BufferPool that caches up to numPages pages.
      *
@@ -49,6 +50,7 @@ public class BufferPool {
         // some code goes here
         pageStore = new HashMap<>();
         this.numPages = numPages;
+        this.fifoQueue = new LinkedList<>();
     }
     
     public static int getPageSize() {
@@ -85,7 +87,7 @@ public class BufferPool {
         // some code goes here
         // if exceed numPages (no space)
         if(pageStore.size() >= numPages){
-            throw new DbException("Pages are full in BufferPool!");
+            evictPage();
         }
         // buffer pool has this page, return it directly
         if(pageStore.containsKey(pid)) {
@@ -99,6 +101,8 @@ public class BufferPool {
         Page page = dbFile.readPage(pid);
         // add into buffer pool
         pageStore.put(pid,page);
+        // update eviction data structure
+        fifoQueue.offer(pid);
         return page;
     }
 
@@ -193,6 +197,9 @@ public class BufferPool {
     private void updateBufferPool(List<Page> pageList, TransactionId tid) throws DbException {
         for(Page page : pageList) {
             page.markDirty(true,tid);
+            if(!pageStore.containsKey(page.getId())) {
+                fifoQueue.offer(page.getId());
+            }
             pageStore.put(page.getId(),page);
             if(pageStore.size() > numPages) {
                 evictPage();
@@ -222,6 +229,7 @@ public class BufferPool {
     public synchronized void discardPage(PageId pid) {
         // some code goes here
         // not necessary for lab1
+        pageStore.remove(pid);
     }
 
     /**
@@ -231,6 +239,11 @@ public class BufferPool {
     private synchronized  void flushPage(PageId pid) throws IOException {
         // some code goes here
         // not necessary for lab1
+        DbFile dbFile = Database.getCatalog().getDatabaseFile(pid.getTableId());
+        Page page = pageStore.get(pid);
+        dbFile.writePage(page);
+        // marked not dirty
+        page.markDirty(false,null);
     }
 
     /** Write all pages of the specified transaction to disk.
@@ -247,6 +260,17 @@ public class BufferPool {
     private synchronized  void evictPage() throws DbException {
         // some code goes here
         // not necessary for lab1
+        PageId pid = fifoQueue.poll();
+        Page page = pageStore.get(pid);
+        if(page.isDirty() != null) {
+            try {
+                flushPage(pid);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        } else {
+            discardPage(pid);
+        }
     }
 
 }

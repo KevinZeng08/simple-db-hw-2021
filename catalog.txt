@@ -1,0 +1,3 @@
+data (f1 int, f2 int)
+some_data_file1 (id int, field1 int, field2 int)
+some_data_file2 (id int, field1 int, field2 int)
