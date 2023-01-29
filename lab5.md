@@ -5,7 +5,6 @@
 
 ## 0. Introduction
 
-
 In this lab you will implement a B+ tree index for efficient lookups and range
 scans. We supply you with all of the low-level code you will need to implement
 the tree structure. You will implement searching, splitting pages,
@@ -20,8 +19,8 @@ trees contain multiple entries, each consisting of a key value and a left and a
 right child pointer. Adjacent keys share a child pointer, so internal nodes
 containing *m* keys have *m*+1 child pointers. Leaf nodes can either contain
 data entries or pointers to data entries in other database files. For
-simplicity, we will implement a B+tree in which the leaf pages actually contain
-the data entries. Adjacent leaf pages are linked together with right and left
+simplicity, we will implement a B+tree in which the **leaf pages actually contain**
+**the data entries**. Adjacent leaf pages are linked together with right and left
 sibling pointers, so range scans only require one initial search through the
 root and internal nodes to find the first leaf page. Subsequent leaf pages are
 found by following right (or left) sibling pointers.
@@ -59,7 +58,6 @@ the first header page. This singleton page is implemented in
 classes, especially `BTreePage`, `BTreeInternalPage` and `BTreeLeafPage`. You
 will need to use these classes in your implementation of the B+Tree.
 
-
 Your first job is to implement the `findLeafPage()` function in
 `BTreeFile.java`. This function is used to find the appropriate leaf page given
 a particular key value, and is used for both searches and inserts. For example,
@@ -88,7 +86,6 @@ happens when the passed-in BTreePageId has `pgcateg()` equal to
 just fetch the page from the buffer pool and return it.  You do not need to
 confirm that it actually contains the provided key value f.
 
-
 Your `findLeafPage()` code must also handle the case when the provided key value
 f is null.  If the provided value is null, recurse on the left-most child every
 time in order to find the left-most leaf page. Finding the left-most leaf page
@@ -97,14 +94,12 @@ should return it.  As mentioned above, you can check the type of page using the
 `pgcateg()` function in `BTreePageId.java`. You can assume that only leaf and
 internal pages will be passed to this function.
 
-
 Instead of directly calling `BufferPool.getPage()` to get each internal page and
 leaf page, we recommend calling the wrapper function we have provided,
 `BTreeFile.getPage()`.  It works exactly like `BufferPool.getPage()`, but takes
 an extra argument to track the list of dirty pages.  This function will be
 important for the next two exercises in which you will actually update the data
 and therefore need to keep track of dirty pages.
-
 
 Every internal (non-leaf) page your `findLeafPage()` implementation visits
 should be fetched with READ_ONLY permission, except the returned leaf page,

@@ -516,6 +516,7 @@ public class BTreeInternalPage extends BTreePage {
 			}
 		}
 
+		// TODO test error
 		if(lessOrEqKey == -1) {
 			throw new DbException("attempt to insert invalid entry with left child " + 
 					e.getLeftChild().getPageNumber() + ", right child " +

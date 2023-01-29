@@ -76,13 +76,12 @@ buffer management policy.
 As we discussed in class, this means that:
 
 *  You shouldn't evict dirty (updated) pages from the buffer pool if they
-   are locked by an uncommitted transaction (this is NO STEAL).
-*  On transaction commit, you should force dirty pages to disk (e.g.,
+   are locked by an **uncommitted** transaction (this is NO STEAL).
+*  On transaction **commit**, you should **force dirty pages to disk** (e.g.,
    write the pages out) (this is FORCE).
-   
 
-To further simplify your life, you may assume that SimpleDB will not crash
-while processing a `transactionComplete` command.  Note that
+To further simplify your life, you may assume that SimpleDB **will not crash**
+**while processing a `transactionComplete`** command.  Note that
 these three points mean that you do not need to implement log-based
 recovery in this lab, since you will never need to undo any work (you never evict
 dirty pages) and you will never need to redo any work (you force
@@ -97,11 +96,11 @@ transaction.
 
 We recommend locking at *page* granularity; please do not
 implement table-level locking (even though it is possible) for simplicity of testing. The rest
-of this document and our unit tests assume page-level locking.
+of this document and our unit tests assume **page-level locking**.
 
-You will need to create data structures that keep track of which locks
-each transaction holds and check to see if a lock should be granted
-to a transaction when it is requested.
+You will need to create data structures that **keep track of which locks**
+**each transaction holds and check to see if a lock should be granted**
+**to a transaction when it is requested**.
 
 You will need to implement shared and exclusive locks; recall that these
 work as follows:
@@ -148,7 +147,7 @@ the unit tests in LockingTest.
 
 ###  2.5. Lock Lifetime
 
-You will need to implement strict two-phase locking.  This means that
+You will need to implement **strict two-phase locking**.  This means that
 transactions should acquire the appropriate type of lock on any object
 before accessing that object and shouldn't release any locks until after
 the transaction commits.
@@ -186,8 +185,8 @@ release them as well. It is clear that you should release all locks
 associated with a transaction after it has committed or aborted to ensure strict 2PL.
 However, it is
 possible for there to be other scenarios in which releasing a lock before
-a transaction ends might be useful. For instance, you may release a shared lock
-on a page after scanning it to find empty slots (as described below).
+a transaction ends might be useful. For instance, you may **release a shared lock**
+**on a page after scanning it to find empty slots** (as described below).
 
 ***
 
@@ -210,8 +209,8 @@ not necessarily all) actions that you should verify work properly:
 You will also want to think especially hard about acquiring and releasing
 locks in the following situations:
 
-*  Adding a new page to a `HeapFile`.  When do you physically
-   write the page to disk?  Are there race conditions with other transactions
+*  Adding a new page to a `HeapFile`.  **When do you physically**
+   **write the page to disk**?  Are there race conditions with other transactions
    (on other threads) that might need special attention at the HeapFile level,
    regardless of page-level locking?
 *  Looking for an empty slot into which you can insert tuples.
@@ -232,8 +231,8 @@ LockingTest.
 
 Modifications from a transaction are written to disk only after it
 commits. This means we can abort a transaction by discarding the dirty
-pages and rereading them from disk. Thus, we must not evict dirty
-pages. This policy is called NO STEAL.
+pages and rereading them from disk. Thus, we **must not evict dirty**
+**pages**. This policy is called **NO STEAL**.
 
 You will need to modify the <tt>evictPage</tt> method in <tt>BufferPool</tt>.
 In particular, it must never evict a dirty page. If your eviction policy prefers a dirty page
@@ -267,7 +266,7 @@ during its execution, an operator may throw a
 internal error or deadlock has occurred.  The test cases we have provided
 you with create the appropriate `TransactionId` objects, pass
 them to your operators in the appropriate way, and invoke
-`transactionComplete` when a query is finished.  We have also
+`transactionComplete` when a  query is finished.  We have also
 implemented `TransactionId`.
 
 
@@ -302,10 +301,10 @@ You will need to detect this situation and throw a
 `TransactionAbortedException`.
 
 There are many possible ways to detect deadlock. A strawman example would be to
-implement a simple timeout policy that aborts a transaction if it has not
+implement a simple **timeout policy** that aborts a transaction if it has not
 completed after a given period of time. For a real solution, you may implement
-cycle-detection in a dependency graph data structure as shown in lecture. In this
-scheme, you would  check for cycles in a dependency graph periodically or whenever
+**cycle-detection in a dependency graph data structure** as shown in lecture. In this
+scheme, you would  **check for cycles in a dependency graph periodically** or whenever
 you attempt to grant a new lock, and abort something if a cycle exists. After you have detected
 that a deadlock exists, you must decide how to improve the situation. Assume you
 have detected a deadlock while  transaction *t* is waiting for a lock.  If you're

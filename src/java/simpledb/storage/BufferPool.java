@@ -3,12 +3,15 @@ package simpledb.storage;
 import simpledb.common.Database;
 import simpledb.common.Permissions;
 import simpledb.common.DbException;
+import simpledb.transaction.LockManager;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
 import java.io.*;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.Lock;
 
 /**
  * BufferPool manages the reading and writing of pages into memory from
@@ -40,7 +43,6 @@ public class BufferPool {
     /** eviction */
     private Deque<PageId> fifoQueue; // FIFO eviction
 
-
     /**
      * Creates a BufferPool that caches up to numPages pages.
      *
@@ -48,7 +50,7 @@ public class BufferPool {
      */
     public BufferPool(int numPages) {
         // some code goes here
-        pageStore = new HashMap<>();
+        pageStore = new ConcurrentHashMap<>();
         this.numPages = numPages;
         this.fifoQueue = new LinkedList<>();
     }
@@ -85,13 +87,25 @@ public class BufferPool {
     public Page getPage(TransactionId tid, PageId pid, Permissions perm)
         throws TransactionAbortedException, DbException {
         // some code goes here
-        // if exceed numPages (no space)
-        if(pageStore.size() >= numPages){
-            evictPage();
+
+        LockManager lockManager = Database.getLockManager();
+        long start = System.currentTimeMillis();
+        long timeout = new Random().nextInt(2000) + 10000;
+        // can't acquire, busy-waiting
+        while(!lockManager.acquireLock(tid,pid,perm)) {
+            long now = System.currentTimeMillis();
+            if(now - start > timeout) {
+                // reach timeout, means deadlock detected
+                throw new TransactionAbortedException();
+            }
         }
         // buffer pool has this page, return it directly
         if(pageStore.containsKey(pid)) {
             return pageStore.get(pid);
+        }
+        // if exceed numPages (no space)
+        if(pageStore.size() >= numPages){
+            evictPage();
         }
         // buffer pool has not, retrieve it from disk and add to buffer pool
         int tableid = pid.getTableId();
@@ -115,9 +129,10 @@ public class BufferPool {
      * @param tid the ID of the transaction requesting the unlock
      * @param pid the ID of the page to unlock
      */
-    public  void unsafeReleasePage(TransactionId tid, PageId pid) {
+    public void unsafeReleasePage(TransactionId tid, PageId pid) {
         // some code goes here
         // not necessary for lab1|lab2
+        Database.getLockManager().releaseLock(tid,pid);
     }
 
     /**
@@ -128,13 +143,14 @@ public class BufferPool {
     public void transactionComplete(TransactionId tid) {
         // some code goes here
         // not necessary for lab1|lab2
+        transactionComplete(tid, true);
     }
 
     /** Return true if the specified transaction has a lock on the specified page */
     public boolean holdsLock(TransactionId tid, PageId p) {
         // some code goes here
         // not necessary for lab1|lab2
-        return false;
+        return Database.getLockManager().hasLock(tid,p);
     }
 
     /**
@@ -147,6 +163,45 @@ public class BufferPool {
     public void transactionComplete(TransactionId tid, boolean commit) {
         // some code goes here
         // not necessary for lab1|lab2
+        // commit: flush dirty pages associated to the transaction to disk
+        if(commit) {
+            // iterate all pages in bufferpool
+            for(Map.Entry<PageId,Page> entry : pageStore.entrySet()) {
+                PageId pid = entry.getKey();
+                // if dirty, query lockmanager to check if page has lock of tx
+                if(entry.getValue().isDirty() != null) {
+                    if(holdsLock(tid, pid)) {
+                        // flush
+                        try {
+                            flushPage(pid);
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+                // release all locks of this pid
+                Database.getLockManager().releaseLock(tid, pid);
+            }
+        }
+        // abort: discard dirty pages associated to the transaction
+        else {
+            // call discardPage() modifies pageStore in foreach
+            // will throw ConcurrentModificationException, so change HashMap to ConcurrentHashMap
+            // iterate all pages in bufferpool
+            for(Map.Entry<PageId,Page> entry : pageStore.entrySet()) {
+                PageId pid = entry.getKey();
+                // if dirty, query lockmanager to check if page has lock of tx
+                if(entry.getValue().isDirty() != null) {
+                    // TODO only page with exclusive lock need to be discarded
+                    if(holdsLock(tid, pid)) {
+                        // discard
+                        discardPage(pid);
+                    }
+                }
+                // release all locks of this pid
+                Database.getLockManager().releaseLock(tid, pid);
+            }
+        }
     }
 
     /**
@@ -215,7 +270,13 @@ public class BufferPool {
     public synchronized void flushAllPages() throws IOException {
         // some code goes here
         // not necessary for lab1
-
+        for(Map.Entry<PageId,Page> entry : pageStore.entrySet()) {
+            if(entry.getValue().isDirty() != null) {
+                PageId pid = entry.getKey();
+                flushPage(pid);
+                Database.getLockManager().releaseLock(null,pid);
+            }
+        }
     }
 
     /** Remove the specific page id from the buffer pool.
@@ -260,17 +321,30 @@ public class BufferPool {
     private synchronized  void evictPage() throws DbException {
         // some code goes here
         // not necessary for lab1
-        PageId pid = fifoQueue.poll();
-        Page page = pageStore.get(pid);
-        if(page.isDirty() != null) {
-            try {
-                flushPage(pid);
-            } catch (IOException e) {
-                e.printStackTrace();
+        for (PageId pid : fifoQueue) {
+            Page page = pageStore.get(pid);
+            // check dirty
+            if (page != null && page.isDirty() == null) {
+                fifoQueue.remove(pid);
+                // release locks
+                Database.getLockManager().releaseLock(pid);
+                discardPage(pid);
+                return;
             }
-        } else {
-            discardPage(pid);
+//            if(page.isDirty() != null) {
+//                try {
+//                    flushPage(pid);
+//                } catch (IOException e) {
+//                    e.printStackTrace();
+//                }
+//            } else {
+//                discardPage(pid);
+//            }
         }
+        new Thread(()->{
+           Database.getLockManager().detectDeadLock();
+        });
+        throw new DbException("no clean page to evict");
     }
 
 }
