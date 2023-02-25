@@ -140,7 +140,6 @@ accept new entries. In that case, the parent should split and add a new entry to
 its parent. This may cause recursive splits and ultimately the creation of a new
 root node.
 
-
 In this exercise you will implement `splitLeafPage()` and `splitInternalPage()`
 in `BTreeFile.java`. If the page being split is the root page, you will need to
 create a new internal node to become the new root page, and update the
@@ -285,10 +284,9 @@ src="redist_internal.png"><br> <i>Figure 3: Redistributing pages</i> </p>
 
 <p align="center"> <img width=500 src="merging_leaf.png"><br> <img width=500
 src="merging_internal.png"><br> <i>Figure 4: Merging pages</i> </p>
-
-As described in the textbook, attempting to delete a tuple from a leaf page that
-is less than half full should cause that page to either steal tuples from one of
-its siblings or merge with one of its siblings.  If one of the page's siblings
+As described in the textbook, attempting to **delete a tuple from a leaf page that**
+**is less than half full** should cause that page to **either steal tuples from one of**
+**its siblings or merge with one of its siblings**.  If one of the page's siblings
 has tuples to spare, the tuples should be evenly distributed between the two
 pages, and the parent's entry should be updated accordingly (see Figure 3).
 However, if the sibling is also at minimum occupancy, then the two pages should

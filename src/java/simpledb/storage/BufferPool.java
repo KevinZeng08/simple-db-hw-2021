@@ -179,9 +179,10 @@ public class BufferPool {
                         }
                     }
                 }
-                // release all locks of this pid
-                Database.getLockManager().releaseLock(tid, pid);
             }
+            // release all locks of this tid
+            LockManager lockManager = Database.getLockManager();
+            lockManager.completeTransaction(tid);
         }
         // abort: discard dirty pages associated to the transaction
         else {
@@ -198,9 +199,9 @@ public class BufferPool {
                         discardPage(pid);
                     }
                 }
-                // release all locks of this pid
-                Database.getLockManager().releaseLock(tid, pid);
             }
+            LockManager lockManager = Database.getLockManager();
+            lockManager.completeTransaction(tid);
         }
     }
 
@@ -274,7 +275,7 @@ public class BufferPool {
             if(entry.getValue().isDirty() != null) {
                 PageId pid = entry.getKey();
                 flushPage(pid);
-                Database.getLockManager().releaseLock(null,pid);
+                Database.getLockManager().releaseLock(pid);
             }
         }
     }
@@ -341,9 +342,6 @@ public class BufferPool {
 //                discardPage(pid);
 //            }
         }
-        new Thread(()->{
-           Database.getLockManager().detectDeadLock();
-        });
         throw new DbException("no clean page to evict");
     }
 

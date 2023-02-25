@@ -178,7 +178,7 @@ public class HeapFile implements DbFile {
         // find a page with an empty slot
         for(int i = 0;i < numPages(); i++) {
             PageId pid = new HeapPageId(tableid,i);
-            // TODO when finding page to insert, READ_ONLY permission is ok
+            // when finding page to insert, READ_ONLY permission is ok
             HeapPage heapPage = (HeapPage) Database.getBufferPool().getPage(tid,pid,Permissions.READ_WRITE);
             // has an empty slot, insert and marked dirty
             if(heapPage.getNumEmptySlots() > 0) {
@@ -186,9 +186,9 @@ public class HeapFile implements DbFile {
                 heapPage.markDirty(true,tid);
                 affectedPages.add(heapPage);
                 break;
+            } else {
+                Database.getBufferPool().unsafeReleasePage(tid,pid);
             }
-            // release lock after scanning full page
-            Database.getLockManager().releaseLock(tid,pid);
         }
         // not found, create a new page and append it to the physical file
         if(affectedPages.size() == 0) {
@@ -260,10 +260,6 @@ public class HeapFile implements DbFile {
             // curPage has no more page to iterate, set null
             if (it != null && !it.hasNext()){
                 it = null;
-                // release lock after scanning full page
-                // only shared lock can be released
-                if(!tid.equals(Database.getLockManager().getOwner(curPage.getId())))
-                    Database.getLockManager().releaseLock(tid,curPage.getId());
             }
 
             while (it == null && curPage != null) {

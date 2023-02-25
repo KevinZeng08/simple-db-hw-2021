@@ -4,6 +4,7 @@ import simpledb.common.Permissions;
 import simpledb.storage.PageId;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @author kevin.zeng
@@ -11,123 +12,152 @@ import java.util.*;
  * @create 2023-01-23
  */
 public class LockManager {
-    private Map<PageId, List<Lock>> locksPerPage;
+    private ConcurrentHashMap<PageId, ConcurrentHashMap<TransactionId, PageLock>> lockMap;
 
 //    private Map<TransactionId, Set<PageId>>
 
     public LockManager() {
-        this.locksPerPage = new HashMap<>();
+        this.lockMap = new ConcurrentHashMap<>();
     }
 
     // only one thread can acquire lock each time
-    public synchronized boolean acquireLock(TransactionId tid, PageId pid, Permissions perm) {
-        // Only one transaction may have an exclusive lock on an object
-        TransactionId owner = getOwner(pid);
-        if(owner != null) {
-            if(owner.equals(tid)) return true;
-            else return false;
-        }
-        if (perm == Permissions.READ_ONLY) {
-            // modify locks per Page
-            if (locksPerPage.containsKey(pid)) {
-                // check whether shared lock of this transaction exists
-                for(Lock lock : locksPerPage.get(pid)) {
-                    if(lock.getTid().equals(tid)) return true;
-                }
-                // acquire shared lock
-                Lock sharedLock = new Lock(tid, pid, LockType.SHARED);
-                locksPerPage.get(pid).add(sharedLock);
-            } else {
-                // acquire shared lock
-                Lock sharedLock = new Lock(tid, pid, LockType.SHARED);
-                List<Lock> newLocks = new ArrayList<>();
-                newLocks.add(sharedLock);
-                locksPerPage.put(pid, newLocks);
-            }
-            return true;
-        } else if (perm == Permissions.READ_WRITE) {
-            // acquire exclusive lock
-            if (locksPerPage.containsKey(pid)) {
-                List<Lock> locks = locksPerPage.get(pid);
-                if (locks.size() > 1) {
-                    return false;
-                }
-                if (locks.isEmpty()) {
-                    Lock exclusiveLock = new Lock(tid, pid, LockType.EXCLUSIVE);
-                    locks.add(exclusiveLock);
-                    locksPerPage.put(pid, locks);
-                    return true;
-                }
-                // if shared lock of Tx is the only lock of this Page, upgrade to exclusive lock
-                Lock lock = locks.get(0);
-                if (lock.getTid().equals(tid)) {
-                    // upgrade
-                    locks.get(0).setType(LockType.EXCLUSIVE);
-                    locksPerPage.put(pid, locks);
-                    return true;
-                } else {
-                    // shared lock of other Transaction exists
-                    return false;
-                }
-            } else {
-                List<Lock> newLocks = new ArrayList<>();
-                Lock exclusiveLock = new Lock(tid, pid, LockType.EXCLUSIVE);
-                newLocks.add(exclusiveLock);
-                locksPerPage.put(pid, newLocks);
+    public synchronized boolean acquireLock(TransactionId tid, PageId pid, Permissions perm) throws TransactionAbortedException {
+
+            int requiredType = perm == Permissions.READ_ONLY ? PageLock.SHARED : PageLock.EXCLUSIVE;
+            final String thread = Thread.currentThread().getName();
+            if(lockMap.get(pid) == null){
+                PageLock pageLock = new PageLock(tid,requiredType);
+                ConcurrentHashMap<TransactionId,PageLock> pageLocks = new ConcurrentHashMap<>();
+                pageLocks.put(tid,pageLock);
+                lockMap.put(pid,pageLocks);
+                //System.out.println(thread + ": the " + pageId + " have no lock, transaction" + tid + " require " + lockType + ", accept");
                 return true;
             }
-        }
-        return false;
+            ConcurrentHashMap<TransactionId,PageLock> pageLocks = lockMap.get(pid);
+
+            if(pageLocks.get(tid) == null){
+                // tid没有该page上的锁
+                if(pageLocks.size() > 1){
+                    //page 上有其他事务的读锁
+                    if (requiredType == PageLock.SHARED){
+                        //tid 请求读锁
+                        PageLock pageLock = new PageLock(tid,PageLock.SHARED);
+                        pageLocks.put(tid,pageLock);
+                        lockMap.put(pid,pageLocks);
+                        //System.out.println(thread + ": the " + pageId + " have many read locks, transaction" + tid + " require " + lockType + ", accept and add a new read lock");
+                        return true;
+                    }
+                    if (requiredType == PageLock.EXCLUSIVE){
+                        // tid 需要获取写锁
+//                        wait(20);
+//                        System.out.println(thread + ": the " + pid + " have lock with diff txid, transaction" + tid + " require write lock, await...");
+                        return false;
+                    }
+                }
+                if (pageLocks.size() == 1){
+                    //page 上有一个其他事务的锁  可能是读锁，也可能是写锁
+                    PageLock curLock = null;
+                    for (PageLock lock : pageLocks.values()){
+                        curLock = lock;
+                    }
+                    if (curLock.getType() == PageLock.SHARED){
+                        //如果是读锁
+                        if (requiredType == PageLock.SHARED){
+                            // tid 需要获取的是读锁
+                            PageLock pageLock = new PageLock(tid,PageLock.SHARED);
+                            pageLocks.put(tid,pageLock);
+                            lockMap.put(pid,pageLocks);
+                            //System.out.println(thread + ": the " + pageId + " have one read lock with diff txid, transaction" + tid + " require read lock, accept and add a new read lock");
+                            return true;
+                        }
+                        if (requiredType == PageLock.EXCLUSIVE){
+                            // tid 需要获取写锁
+//                            wait(10);
+//                            System.out.println(thread + ": the " + pid + " have lock with diff txid, transaction" + tid + " require write lock, await...");
+                            return false;
+                        }
+                    }
+                    if (curLock.getType() == PageLock.EXCLUSIVE){
+                        // 如果是写锁
+//                        wait(10);
+//                        System.out.println(thread + ": the " + pid + " have one write lock with diff txid, transaction" + tid + " require read lock, await...");
+                        return false;
+                    }
+                }
+
+            }
+            if (pageLocks.get(tid) != null){
+                // tid有该page上的锁
+                PageLock pageLock = pageLocks.get(tid);
+                if (pageLock.getType() == PageLock.SHARED){
+                    // tid 有 page 上的读锁
+                    if (requiredType == PageLock.SHARED){
+                        //tid 需要获取的是读锁
+                        //System.out.println(thread + ": the " + pageId + " have one lock with same txid, transaction" + tid + " require " + lockType + ", accept");
+                        return true;
+                    }
+                    if (requiredType == PageLock.EXCLUSIVE){
+                        //tid 需要获取的是写锁
+                        if(pageLocks.size() == 1){
+                            // 该page上 只有tid的 读锁，则可以将其升级为写锁
+                            pageLock.setType(PageLock.EXCLUSIVE);
+                            pageLocks.put(tid,pageLock);
+                            //System.out.println(thread + ": the " + pageId + " have read lock with same txid, transaction" + tid + " require write lock, accept and upgrade!!!");
+                            return true;
+                        }
+                        if (pageLocks.size() > 1){
+                            // 该page 上还有其他事务的读锁，则不能升级
+//                            System.out.println(thread + ": the " + pid + " have many read locks, transaction" + tid + " require write lock, abort!!!");
+//                            return false;
+                            throw new TransactionAbortedException();
+                        }
+                    }
+                }
+                if (pageLock.getType() == PageLock.EXCLUSIVE){
+                    // tid 有 page上的写锁
+                    //System.out.println(thread + ": the " + pageId + " have write lock with same txid, transaction" + tid + " require " + lockType + ", accept");
+                    return true;
+                }
+            }
+
+            System.out.println("----------------------------------------------------");
+            return false;
     }
 
     public synchronized boolean releaseLock(PageId pid) {
-        return releaseLock(null, pid);
+        lockMap.remove(pid);
+        return true;
     }
 
     public synchronized boolean releaseLock(TransactionId tid, PageId pid) {
-        // check tx status
-        List<Lock> locks = locksPerPage.get(pid);
-        if (locks == null || locks.isEmpty()) {
-            locksPerPage.remove(pid);
-            return false;
-        }
-        if (tid == null) {
-            locksPerPage.remove(pid);
+        if(hasLock(tid,pid)) {
+            ConcurrentHashMap<TransactionId, PageLock> pageLocks = lockMap.get(pid);
+            pageLocks.remove(tid);
+            if(pageLocks.size() == 0) {
+                lockMap.remove(pid);
+            }
+            // notify other threads
+            this.notifyAll();
             return true;
         }
-        boolean ret = locks.removeIf((lock) -> lock.getTid().equals(tid));
-        if (locks.isEmpty()) {
-            locksPerPage.remove(pid);
-        }
-        return ret;
+        return false;
     }
 
     public synchronized boolean hasLock(TransactionId tid, PageId pid) {
-        List<Lock> locks = locksPerPage.get(pid);
-        if (locks == null) {
+        ConcurrentHashMap<TransactionId, PageLock> pageLocks = lockMap.get(pid);
+        if (pageLocks == null) {
             return false;
         }
-        for (Lock lock : locks) {
-            if (lock.getTid().equals(tid)) {
-                return true;
-            }
-        }
-        return false;
+        PageLock pageLock = pageLocks.get(tid);
+        if(pageLock == null) return false;
+        return true;
     }
 
-    // get the owner transaction of this page
-    public TransactionId getOwner(PageId pid) {
-        List<Lock> locks = locksPerPage.get(pid);
-        if(locks == null) {
-            return null;
+    public synchronized void completeTransaction(TransactionId tid){
+        // release all locks of tid
+        Set<PageId> pageIds = lockMap.keySet();
+        for(PageId pid : pageIds) {
+            releaseLock(tid, pid);
         }
-        if(locks.size() == 1 && locks.get(0).getType() == LockType.EXCLUSIVE) {
-            return locks.get(0).getTid();
-        }
-        return null;
-    }
-
-    public boolean detectDeadLock() {
-        return false;
     }
 }
